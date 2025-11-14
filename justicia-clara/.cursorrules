@@ -1,0 +1,125 @@
+# Cursor Rules — Justicia Clara (Plain-Language Legal Simplifier)
+
+## Project goals
+- Simplify Spanish legal text into **plain language** WITHOUT changing meaning.
+- Enforce **deterministic** behavior (temperature=0), and validate outputs with:
+  - deterministic checks (amounts, dates, articles, negations),
+  - semantic similarity (SentenceTransformers),
+  - an LLM “judge” that returns strict JSON.
+- Provide two entry points: CLI (`cli.py`) and Streamlit UI (`ui.py`).
+- Optional OCR with docTR for scanned PDFs.
+
+## Tech & layout (do not change structure without instruction)
+- Python 3.10+; Pydantic v2.
+- LLM provider via `.env`: `MODEL_PROVIDER=ollama|openai`.
+- Repo:
+  - `app/schema.py` — Pydantic models (SimplifyResult).
+  - `app/llm.py` — provider-agnostic `chat()` + `chat_json()`.
+  - `app/checks.py` — regex extractors + `rule_checks()`.
+  - `app/semantic.py` — sentence-transformers similarity.
+  - `app/ocr.py` — docTR wrapper (optional).
+  - `app/pipeline.py` — orchestrates: clean → simplify → checks → similarity → judge.
+  - `cli.py` — CLI runner.
+  - `ui.py` — Streamlit UI.
+
+## Ground rules for code changes
+1. **Determinism first**: keep `temperature=0` in all LLM calls.
+2. **No schema drift**: Editing `SimplifyResult` must be justified; update all call sites and UI if changed.
+3. **Strict JSON**: Any LLM that should return JSON must be called through `chat_json()`. If parsing fails, retry once with “Devuelve SOLO JSON válido”.
+4. **No hidden side-effects**: Functions must be pure (no global state) except model caches (embedding model/ocr predictor).
+5. **PII safety**: If logging user text, mask DNI/IBAN by default (`****`) unless explicitly asked not to.
+6. **Performance**: Cache heavy models at module import (sentence-transformers, docTR). Avoid reloading per request.
+7. **Errors > silence**: Raise/return clear error messages; never swallow exceptions.
+8. **Dependencies**: Only modify `requirements.txt` if strictly necessary; keep CPU-only docTR unless explicitly told otherwise.
+
+## LLM prompts (keep as is unless instructed)
+- **Simplify prompt (pipeline.py)**: Must forbid altering numbers, dates, names, articles, conditions; ask for **plain text only**.
+- **Judge prompt (pipeline.py via chat_json)**: Must return JSON keys:
+  `verdict(equivalent|minor_diffs|mismatch), issues[], changed_numbers[], changed_dates[], changed_parties[], negation_flip`.
+
+## Acceptance criteria per module
+- `app/llm.py`
+  - `chat(system, user) -> str` works for both Ollama (HTTP 11434) and OpenAI.
+  - `chat_json(system, user) -> dict` retries once with stricter instruction if JSON parsing fails.
+- `app/checks.py`
+  - `rule_checks(original, simplified)` returns `(checks:dict, details:dict)`.
+  - Checks include: `amounts_ok`, `dates_ok`, `articles_ok`, `negation_flip`.
+  - Regexes robust to Spanish formats (e.g., `1.234,56 €`, `11/02/2025`).
+- `app/semantic.py`
+  - Loads `"paraphrase-multilingual-MiniLM-L12-v2"` once; exposes `similarity(a,b)->float ∈ [-1,1]` (expect ≥0.80 to pass).
+- `app/ocr.py` (optional)
+  - `run_doctr(bytes, filetype)->str` returns plain text; no bounding boxes needed.
+- `app/pipeline.py`
+  - `process_text(text)->(SimplifyResult, ok:bool)` only. No I/O.
+  - OK criteria (all must hold): all booleans true except `negation_flip`, `similarity≥0.80`, `judge.verdict∈{equivalent, minor_diffs}`.
+  - Cleaning: NFKC, collapse spaces, preserve punctuation.
+- `cli.py`
+  - Handles `.txt` and PDF **with text layer** (no OCR by default). Writes JSON to `data/outputs/`.
+- `ui.py`
+  - Two tabs: Texto & PDF. Calls `process_text()`. Shows pass/fail + payload JSON.
+
+## How to add/modify validation rules (checklist)
+- Add extractor in `app/checks.py` (regex or parser).
+- Extend `rule_checks()` with:
+  - extraction on both `original` and `simplified`,
+  - set a boolean flag and add `details[...]` only on failure,
+  - keep function pure.
+- Update acceptance logic in `app/pipeline.py` **only if** the new check is critical to OK status.
+- Add 1–2 minimal unit tests (if tests directory exists), or a CLI smoke sample in `data/raw/`.
+
+## How non-coders can extend schema (analyst flow)
+- Analysts provide a **field form**: name, type (texto/número/fecha/lista), obligatorio (sí/no), reglas (formato/rango/catálogo), examples.
+- Developer maps fields into `SimplifyResult` OR introduces a new model in `app/schema.py`, then:
+  - updates LLM prompts to request these keys,
+  - updates acceptance criteria accordingly,
+  - ensures `chat_json()` is used when expecting JSON.
+
+## Error handling & messaging
+- If `chat_json()` fails twice → raise `ValueError("LLM_JSON_PARSE_FAILED")` up the stack; UI must show a friendly message.
+- If `PdfReader` pages return empty strings, suggest OCR path in the message but do not auto-invoke OCR unless configured.
+
+## Performance & caching
+- SentenceTransformer and docTR must be module-level singletons.
+- Do NOT download models at runtime; rely on environment to have them.
+- Keep request path under ~1.5s for short texts on laptop hardware (guideline).
+
+## Logging (dev)
+- CLI prints: pass/fail + simplified text length + similarity.
+- UI shows the `SimplifyResult` JSON; do not print full original text to console logs in production mode.
+
+## Commit style
+- Conventional commits (at least `feat:`, `fix:`, `refactor:`, `docs:`).
+- One concern per PR; include a short runbook note if changing prompts or acceptance logic.
+
+## Common tasks (Cursor, follow these recipes)
+
+### Task A — Tighten number/date detection
+1) Edit `app/checks.py`: improve regex; ensure `_cmp()` still used.
+2) Run: `python cli.py data/raw/sample.txt` and verify `amounts_ok` and `dates_ok`.
+3) If false positives/negatives, add `details[...]` examples to aid debugging.
+
+### Task B — Add a new rule (e.g., preserve party names)
+1) Implement `parties(text)->List[str]` in `app/checks.py` (heuristics ok).
+2) Add `checks["parties_ok"]` in `rule_checks()`.
+3) Update OK criteria in `app/pipeline.py` if mandatory.
+4) Smoke test via CLI.
+
+### Task C — Switch provider (Ollama ↔ OpenAI)
+1) No code changes. Set `.env`: `MODEL_PROVIDER=openai`, `LLM_MODEL=gpt-4o-mini`, and API key.
+2) Ensure `chat()` and `chat_json()` still route correctly.
+
+### Task D — Add OCR path
+1) In `cli.py` and/or `ui.py`, if PDF text layer empty, call `app/ocr.run_doctr(...)`.
+2) Guard with try/except and a clear message if `python-doctr` not installed.
+
+## Non-goals
+- No database, no RAG/vector store, no multi-agent orchestration in this repo.
+- No GPU-only dependencies by default.
+
+## Runbook (developer quickstart)
+- Install: `pip install -r requirements.txt`
+- Local LLM: `ollama serve && ollama pull llama3`
+- CLI: `python cli.py data/raw/sample.txt`
+- UI: `streamlit run ui.py`
+
+# End of rules

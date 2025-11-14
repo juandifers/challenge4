@@ -1,0 +1,12 @@
+pydantic>=2
+python-dotenv
+requests
+sentence-transformers
+numpy
+pypdf
+streamlit
+# OCR (optional; only if you’ll process scanned PDFs/images)
+python-doctr[torch]
+pdf2image
+pillow
+torch torchvision --index-url https://download.pytorch.org/whl/cpu
