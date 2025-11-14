@@ -1,0 +1,78 @@
+Analiza el archivo subido (puede ser .txt o .json) que contiene el texto completo o estructurado de una sentencia o resolución judicial española.
+
+Tu tarea es:
+1. Leer el contenido del archivo.
+2. Identificar y evaluar la presencia de los **elementos esenciales** que debe contener una sentencia del Juzgado de Primera Instancia en España.
+3. Indicar qué puntos están **presentes**, cuáles **faltan** o están **incompletos**, y si hay **elementos nuevos o no estándar**.
+
+---
+
+🔹 **LISTA DE VERIFICACIÓN OFICIAL:**
+
+1. **Encabezado institucional**
+   - Roj / ECLI  
+   - Id Cendoj  
+   - Órgano judicial (Juzgado de Primera Instancia nº __)  
+   - Sede y sección  
+   - Fecha de la resolución  
+   - Nº de recurso y resolución  
+   - Tipo de procedimiento  
+   - Nombre del ponente o juez  
+   - Tipo de resolución (sentencia, auto, etc.)
+
+2. **Identificación de las partes**
+   - Demandante  
+   - Demandado  
+   - Procuradores  
+   - Abogados  
+   - Representación o apoderamiento
+
+3. **Antecedentes de hecho**
+   - Exposición del proceso (demanda, contestación, audiencia previa)  
+   - Hechos relevantes y pruebas  
+   - Cumplimiento de las prescripciones legales
+
+4. **Fundamentos de derecho**
+   - Estructura numerada (PRIMERO, SEGUNDO, etc.)  
+   - Citas normativas (Código Civil, LEC, Ley de Usura, Ley de Consumidores, Directiva 93/13/CEE, etc.)  
+   - Jurisprudencia citada (TS, AP, TJUE)  
+   - Aplicación razonada al caso
+
+5. **Decisión o fallo**
+   - Epígrafe “FALLO”  
+   - Decisión expresa (estimación/desestimación)  
+   - Consecuencias jurídicas (nulidad, condena, restitución, etc.)  
+   - Indicación sobre ejecución o liquidación
+
+6. **Costas procesales**
+   - Pronunciamiento claro sobre costas
+
+7. **Recursos**
+   - Si la sentencia es firme o recurrible  
+   - Plazo y órgano competente para recurrir
+
+8. **Cláusula de protección de datos**
+   - Advertencia sobre anonimización y difusión de datos personales
+
+---
+
+🔍 **FORMATO DE SALIDA ESPERADO:**
+
+Muestra los resultados en una **tabla en Markdown** con tres columnas:
+
+| 🟩 Elemento | 🟨 Estado (Presente / Ausente / Parcial) | 🟥 Comentarios o fragmento detectado / faltante |
+
+Después de la tabla, incluye una sección:
+
+**“Elementos no estándar detectados”**  
+➡️ Indica cualquier contenido nuevo o impropio de una sentencia judicial (por ejemplo: datos personales sin ocultar, menciones a leyes extranjeras, partes procesales no típicas, estructuras no usuales).
+
+Finalmente, si el documento cumple con todos los puntos:
+✅ **Indica: “Cumple con todos los requisitos formales de una sentencia española.”**
+
+---
+
+📁 **Formato compatible:**
+- Si el archivo es `.txt`, analiza todo el texto.  
+- Si el archivo es `.json`, revisa los valores de cada clave para identificar texto que corresponda a cada apartado (por ejemplo: `"fundamentos": "...", "fallo": "..."`).  
+
