@@ -101,5 +101,6 @@ class SimplifyResult(BaseModel):
     simplified: str = Field(..., description="Simplified text")
     similarity: float = Field(..., ge=0.0, le=1.0, description="Semantic similarity score")
     checks: dict = Field(default_factory=dict, description="Deterministic validation checks")
+    details: dict = Field(default_factory=dict, description="Detailed validation information")
     judge: Optional[dict] = Field(None, description="LLM judge evaluation")
 

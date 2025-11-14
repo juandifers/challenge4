@@ -9,4 +9,5 @@ streamlit
 python-doctr[torch]
 pdf2image
 pillow
-torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# torch and torchvision should be installed separately with:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
